@@ -21,7 +21,7 @@
 //
 // Never put the App Secret in this file: it is public browser code.
 window.META_CONFIG = {
-  appId: '1133874879052001',
+  appId: (typeof META_APP_ID !== 'undefined' ? META_APP_ID : 'ADD_YOUR_APP_ID'),
   apiVersion: 'v27.0',
   scopes: [
     'public_profile',

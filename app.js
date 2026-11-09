@@ -30,4 +30,5 @@ document.addEventListener('keydown',event=>{
   closeModal();
   if(typeof closeProfile==='function')closeProfile();
   if(typeof closeFbSetup==='function')closeFbSetup();
+  if(typeof closeWebhookPanel==='function')closeWebhookPanel();
 });

@@ -1,0 +1,9 @@
+Dashboard:  http://127.0.0.1:4173
+Webhook:    http://127.0.0.1:4173/webhooks/meta
+Verify token configured: yes
+App secret configured:   yes
+Callback URL: https://81e4-42-105-174-249.ngrok-free.app/webhooks/meta
+[webhook] Verification succeeded; returning challenge.
+[webhook] Verification failed (mode=null, token match=false).
+[webhook] Verification succeeded; returning challenge.
+[webhook] Verification failed (mode=null, token match=false).

@@ -23,6 +23,10 @@ const HOST = process.env.HOST || '127.0.0.1';
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || '';
 const APP_SECRET = process.env.META_APP_SECRET || '';
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || '';
+const META_APP_ID = process.env.META_APP_ID || '';
+
+// Read the App ID that fb-config.js defines for the browser (read-only, never
+// overwritten by env vars). META_APP_ID in .env wins when set.
 const LOG_PAYLOADS = process.env.LOG_WEBHOOK_PAYLOADS === '1';
 
 // Latest webhook events, exposed to the dashboard's notification panel.
@@ -224,9 +228,10 @@ const server = http.createServer(function (req, res) {
   serveStatic(req, res, url.pathname);
 });
 
-server.listen(PORT, HOST, function () {
+server.listen(PORT, '0.0.0.0', function () {
   console.log('Dashboard:  http://' + HOST + ':' + PORT);
   console.log('Webhook:    http://' + HOST + ':' + PORT + '/webhooks/meta');
-  console.log('Verify token configured: %s', VERIFY_TOKEN ? 'yes' : 'NO — set META_VERIFY_TOKEN');
-  console.log('App secret configured:   %s', APP_SECRET ? 'yes' : 'NO — set META_APP_SECRET');
+  console.log('Verify token configured: %s', isConfigured(VERIFY_TOKEN) ? 'yes' : 'NO — set META_VERIFY_TOKEN');
+  console.log('App secret configured:   %s', isConfigured(APP_SECRET) ? 'yes' : 'NO — set META_APP_SECRET (placeholder still set)');
+  if (PUBLIC_BASE_URL) console.log('Callback URL: %s/webhooks/meta', PUBLIC_BASE_URL.replace(/\/+$/, ''));
 });
