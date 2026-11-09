@@ -95,3 +95,14 @@ body.modal-open,body.nav-open{overflow:hidden}
   .top-actions{gap:8px}
   .iconbtn{display:none}
 }
+
+/* --- setup guide + demo accents --- */
+.setup-steps{display:grid;gap:11px;margin:14px 0 18px}
+.setup-step{display:flex;gap:11px;align-items:flex-start}
+.setup-step b{height:24px;width:24px;border-radius:8px;background:var(--purple2);color:var(--purple);display:grid;place-items:center;font-size:11px;flex:0 0 auto}
+.setup-step strong{display:block;font-size:12px;margin-bottom:1px}
+.setup-step span{color:var(--muted);font-size:11px;line-height:1.45}
+.setup-step code{background:#f2f3f7;border-radius:4px;padding:1px 4px;font-size:10.5px;color:#4f5464}
+a.btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.conn-dot.demo{background:#e0a21a;box-shadow:0 0 0 4px #e0a21a1f}
+.pill.demo{background:#fdf3dc;color:#96690a}

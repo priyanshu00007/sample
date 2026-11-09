@@ -1,14 +1,27 @@
-// Meta app configuration used by the Facebook JS SDK in index.html.
+// Meta app configuration for Facebook Login.
 //
-// 1. Create/choose an app at https://developers.facebook.com/apps and copy its App ID.
-// 2. Add this site's origin (e.g. http://localhost:3000 or https://yourdomain.com)
-//    under App settings → Basic → App domains / Valid OAuth redirect URIs.
-// 3. Request only scopes your app has been approved for. Unapproved permissions
-//    show up in the login dialog as unavailable.
+// WHERE TO GET THE APP ID
+// 1. Open https://developers.facebook.com/apps and sign in.
+// 2. Create app → choose "Business" (or "Other" → Business) and name it Orbit.
+// 3. App settings → Basic → copy "App ID" (a ~15–16 digit number).
+//    The App Secret is on the same page — server-side only, never in this file.
+// 4. On the same page, add App Domains: localhost
+//    (add 127.0.0.1 too if you open the site that way).
+// 5. Products → Facebook Login → Settings:
+//    Client OAuth Login ON, Web OAuth Login ON,
+//    Valid OAuth Redirect URIs: http://localhost:4173/
+// 6. Add your Facebook account under App roles (Administrator or Tester).
+//    While the app is in Development mode, only those accounts can log in.
+// 7. Paste the App ID below, run `node server.js`, then open http://localhost:4173
+//    (not a file:// URL — Facebook Login needs an http origin).
 //
-// Never put the App Secret in this file — it is public browser code.
+// The scopes below work for app admins/testers immediately, but need Advanced
+// Access (App Review) before other people can grant them. Request the minimum
+// your app actually uses.
+//
+// Never put the App Secret in this file: it is public browser code.
 window.META_CONFIG = {
-  appId: 'YOUR_META_APP_ID',
+  appId: '1133874879052001',
   apiVersion: 'v27.0',
   scopes: [
     'public_profile',

@@ -7,6 +7,7 @@
 let metaSession = null;
 let metaData = null;
 let metaLoading = false;
+let metaIsDemo = false;
 
 function fbSdkReady() {
   return window.FB_SDK_READY === true && typeof FB !== 'undefined' &&
@@ -37,9 +38,11 @@ function storeMetaSession(authResponse) {
 
 function connectFacebook() {
   if (!fbSdkReady()) {
-    toast('Add your Meta app ID in fb-config.js to enable Facebook Login (serve the page over http://localhost, not file://).');
+    openFbSetup();
     return;
   }
+
+  metaIsDemo = false;
 
   FB.login(function (response) {
     if (!response.authResponse) {
@@ -161,6 +164,11 @@ function renderLoggedOutState(status) {
 
 function loadMetaData(options) {
   const opts = options || {};
+  if (metaIsDemo) {
+    renderMetaData();
+    toast('Demo data refreshed.');
+    return;
+  }
   if (!fbSdkReady()) {
     toast('Facebook SDK is not ready. Add your app ID in fb-config.js.');
     return;
@@ -335,9 +343,11 @@ function renderOverview(data) {
 
   const notice = document.querySelector('#overview .notice');
   if (notice) {
-    notice.innerHTML = '<b>ⓘ Live Meta data</b> Loaded from the Graph API for ' + esc(data.me.name) +
-      ' at ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) +
-      '. Values depend on the permissions granted to your app.';
+    notice.innerHTML = metaIsDemo
+      ? '<b>ⓘ Demo account</b> Sample profile, Pages and posts for exploring the dashboard. Add your Meta app ID in fb-config.js to load real data.'
+      : '<b>ⓘ Live Meta data</b> Loaded from the Graph API for ' + esc(data.me.name) +
+        ' at ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) +
+        '. Values depend on the permissions granted to your app.';
   }
 
   const chart = document.querySelector('#overview .chart');
@@ -513,6 +523,8 @@ function renderInstagram(data) {
         tile.style.backgroundImage = 'url("' + source + '")';
         tile.style.backgroundSize = 'cover';
         tile.style.backgroundPosition = 'center';
+      } else {
+        tile.textContent = '◎';
       }
       feed.appendChild(tile);
     });
@@ -573,14 +585,16 @@ function renderConnectionState(data) {
   const title = plan.querySelector('strong');
   const text = plan.querySelector('p');
   const button = plan.querySelector('button');
-  if (title) title.textContent = 'Facebook connected';
+  if (title) title.textContent = metaIsDemo ? 'Demo account active' : 'Facebook connected';
   if (text) {
-    text.textContent = 'Signed in as ' + data.me.name + ' · ' + data.pages.length +
-      ' Page' + (data.pages.length === 1 ? '' : 's');
+    text.textContent = metaIsDemo
+      ? 'Sample profile and Pages · connect Meta for live data'
+      : 'Signed in as ' + data.me.name + ' · ' + data.pages.length +
+        ' Page' + (data.pages.length === 1 ? '' : 's');
   }
   if (button) {
-    button.textContent = '↻ Refresh Meta data';
-    button.setAttribute('onclick', 'loadMetaData()');
+    button.textContent = metaIsDemo ? 'Exit demo mode' : '↻ Refresh Meta data';
+    button.setAttribute('onclick', metaIsDemo ? 'exitDemo()' : 'loadMetaData()');
   }
 
   const navCount = document.querySelector('#mainNav [data-section="pages"] .count');
@@ -594,7 +608,10 @@ function renderConnectionState(data) {
   const sidebarName = document.getElementById('sidebarUserName');
   if (sidebarName) sidebarName.textContent = data.me.name;
   const dot = document.getElementById('connDot');
-  if (dot) dot.classList.add('show');
+  if (dot) {
+    dot.classList.add('show');
+    dot.classList.toggle('demo', metaIsDemo);
+  }
 }
 
 /* ----------------------------------------------------------------- helpers */
@@ -796,10 +813,10 @@ function renderProfileModal() {
   if (!metaSession || !metaData) {
     body.innerHTML = '<div class="profile-hero"><div class="profile-avatar">?</div>' +
       '<div><strong>Not signed in</strong><span>Connect Facebook to see your profile and Pages</span></div></div>' +
-      '<p class="profile-note">Facebook Login is configured with the app ID in <b>fb-config.js</b>. ' +
-      'Once it is set, signing in loads your real profile, Pages and Instagram accounts here.</p>' +
+      '<p class="profile-note">Facebook Login needs a Meta app ID in <b>fb-config.js</b>. ' +
+      'Click below for the exact setup steps, or explore the dashboard with sample account data first.</p>' +
       '<div class="profile-actions"><button class="btn primary" onclick="closeProfile();connectFacebook()">Continue with Facebook</button>' +
-      '<button class="btn" onclick="closeProfile()">Not now</button></div>';
+      '<button class="btn" onclick="enterDemoAccount()">View demo account</button></div>';
     return;
   }
 
@@ -817,8 +834,9 @@ function renderProfileModal() {
   }).join('');
 
   body.innerHTML = '<div class="profile-hero"><div class="profile-avatar">' + esc(initials(me.name)) +
-    '</div><div><strong>' + esc(me.name) + '</strong><span>Facebook profile · Connected</span></div>' +
-    '<span class="pill">Live</span></div>' +
+    '</div><div><strong>' + esc(me.name) + '</strong><span>' +
+    (metaIsDemo ? 'Demo account · sample data' : 'Facebook profile · Connected') + '</span></div>' +
+    '<span class="pill' + (metaIsDemo ? ' demo' : '') + '">' + (metaIsDemo ? 'Demo' : 'Live') + '</span></div>' +
     '<div class="detail-grid">' +
     '<div class="detail-item"><small>Facebook user ID</small><b>' + esc(me.id) + '</b></div>' +
     '<div class="detail-item"><small>Pages</small><b>' + pages.length + '</b></div>' +
@@ -827,9 +845,14 @@ function renderProfileModal() {
     '</div>' +
     '<div class="profile-section"><h4>Pages you manage</h4>' +
     (pageRows || '<div class="empty" style="padding:14px">No Pages were returned.</div>') + '</div>' +
-    '<p class="profile-note">Details come from the Meta Graph API and refresh when the dashboard reloads.</p>' +
-    '<div class="profile-actions"><button class="btn" onclick="loadMetaData()">↻ Refresh details</button>' +
-    '<button class="btn" onclick="disconnectFacebook()">Log out</button></div>';
+    '<p class="profile-note">' + (metaIsDemo
+      ? 'This is sample data. Add a Meta app ID in fb-config.js to sign in with your real account.'
+      : 'Details come from the Meta Graph API and refresh when the dashboard reloads.') + '</p>' +
+    '<div class="profile-actions">' + (metaIsDemo
+      ? '<button class="btn" onclick="enterDemoAccount()">↻ Refresh demo</button>' +
+        '<button class="btn" onclick="exitDemo()">Exit demo</button>'
+      : '<button class="btn" onclick="loadMetaData()">↻ Refresh details</button>' +
+        '<button class="btn" onclick="disconnectFacebook()">Log out</button>') + '</div>';
 }
 
 function initials(name) {
@@ -839,6 +862,7 @@ function initials(name) {
 }
 
 function sessionExpiryLabel() {
+  if (metaIsDemo) return 'Demo session';
   if (!metaSession || !metaSession.expiresIn || !metaSession.obtainedAt) return 'Active';
   const left = metaSession.obtainedAt + Number(metaSession.expiresIn) * 1000 - Date.now();
   if (left <= 0) return 'Expired';
@@ -856,9 +880,121 @@ function disconnectFacebook() {
   FB.logout(function () {
     metaSession = null;
     metaData = null;
+    metaIsDemo = false;
     metaStatusStarted = false;
     closeProfile();
     toast('Logged out of Facebook. Reloading demo data…');
     setTimeout(function () { window.location.reload(); }, 700);
   });
+}
+
+/* ---------------------------------------------------------- setup + demo */
+
+const fbSetupModalEl = document.getElementById('fbSetupModal');
+if (fbSetupModalEl) {
+  fbSetupModalEl.addEventListener('click', function (event) {
+    if (event.target === fbSetupModalEl) closeFbSetup();
+  });
+}
+
+function openFbSetup() {
+  const modal = document.getElementById('fbSetupModal');
+  if (!modal) {
+    toast('Add your Meta app ID in fb-config.js to enable Facebook Login.');
+    return;
+  }
+  if (typeof closeNav === 'function') closeNav();
+  if (typeof closeProfile === 'function') closeProfile();
+  modal.classList.add('show');
+  document.body.classList.add('modal-open');
+}
+
+function closeFbSetup() {
+  const modal = document.getElementById('fbSetupModal');
+  if (!modal) return;
+  modal.classList.remove('show');
+  document.body.classList.remove('modal-open');
+}
+
+function enterDemoAccount() {
+  metaIsDemo = true;
+  metaSession = { demo: true, userId: 'demo_account', obtainedAt: Date.now() };
+  metaData = demoAccountData();
+  closeFbSetup();
+  renderMetaData();
+  toast('Demo account loaded — sample profile, Pages and posts.');
+}
+
+function exitDemo() {
+  metaIsDemo = false;
+  metaSession = null;
+  metaData = null;
+  closeFbSetup();
+  closeProfile();
+  window.location.reload();
+}
+
+function demoAccountData() {
+  const day = 864e5;
+  const iso = function (offset) { return new Date(Date.now() - offset * day).toISOString(); };
+  return {
+    me: { id: 'demo_1000042', name: 'Priyanshu Rathod' },
+    fetchedAt: new Date(),
+    pages: [
+      {
+        page: {
+          id: 'demo_page_1', name: 'PriyanshLabs', category: 'Software Company',
+          link: 'https://www.facebook.com/', followers_count: 8420, fan_count: 8100, access_token: 'demo'
+        },
+        posts: [
+          {
+            message: 'How API rate limiting works in production', created_time: iso(1),
+            reactions: { summary: { total_count: 342 } }, comments: { summary: { total_count: 28 } },
+            attachments: { data: [{ media_type: 'photo' }] }
+          },
+          {
+            message: 'Shipping the new social control center', created_time: iso(6),
+            reactions: { summary: { total_count: 120 } }, comments: { summary: { total_count: 9 } },
+            attachments: { data: [{ media_type: 'video' }] }
+          }
+        ],
+        insights: {
+          page_total_media_view_unique: 64200, page_media_view: 128400, page_post_engagements: 9420
+        },
+        ig: {
+          id: 'demo_ig_1', name: 'Priyansh Labs', username: 'priyanshlabs',
+          followers_count: 16472, follows_count: 284, media_count: 126
+        },
+        igMedia: [
+          {
+            caption: '5 backend concepts every developer should know', media_type: 'VIDEO',
+            permalink: 'https://www.instagram.com/', timestamp: iso(1), like_count: 840, comments_count: 33
+          },
+          {
+            caption: 'Build projects that prove your skills', media_type: 'CAROUSEL_ALBUM',
+            permalink: 'https://www.instagram.com/', timestamp: iso(4), like_count: 512, comments_count: 21
+          }
+        ],
+        igReach: 52600
+      },
+      {
+        page: {
+          id: 'demo_page_2', name: 'Orbit Dev Tools', category: 'Brand',
+          link: 'https://www.facebook.com/', followers_count: 2310, fan_count: 2300, access_token: 'demo'
+        },
+        posts: [
+          {
+            message: 'Orbit 2.0 is live', created_time: iso(3),
+            reactions: { summary: { total_count: 64 } }, comments: { summary: { total_count: 5 } }
+          }
+        ],
+        insights: {
+          page_total_media_view_unique: 12100, page_media_view: 21400, page_post_engagements: 1200
+        },
+        ig: null,
+        igMedia: [],
+        igReach: null
+      }
+    ]
+  };
 }

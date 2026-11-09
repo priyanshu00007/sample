@@ -29,4 +29,5 @@ document.addEventListener('keydown',event=>{
   closeNav();
   closeModal();
   if(typeof closeProfile==='function')closeProfile();
+  if(typeof closeFbSetup==='function')closeFbSetup();
 });

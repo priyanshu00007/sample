@@ -9,11 +9,25 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
+// Load .env when present so `node server.js` picks up local settings.
+if (typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile(path.join(__dirname, '.env'));
+  } catch (err) {
+    if (err.code !== 'ENOENT') console.warn('[env] Could not load .env:', err.message);
+  }
+}
+
 const PORT = Number(process.env.PORT) || 4173;
 const HOST = process.env.HOST || '127.0.0.1';
 const VERIFY_TOKEN = process.env.META_VERIFY_TOKEN || '';
 const APP_SECRET = process.env.META_APP_SECRET || '';
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || '';
 const LOG_PAYLOADS = process.env.LOG_WEBHOOK_PAYLOADS === '1';
+
+// Latest webhook events, exposed to the dashboard's notification panel.
+const webhookEvents = [];
+const MAX_EVENTS = 50;
 
 const ROOT = __dirname;
 const TYPES = {
@@ -75,6 +89,55 @@ function verifyWebhook(url, res) {
   return send(res, 403, 'Verification failed');
 }
 
+function isConfigured(value) {
+  return Boolean(value) && value.indexOf('replace-with') !== 0;
+}
+
+function summarizeValue(value, max) {
+  let text;
+  if (typeof value === 'string') text = value;
+  else {
+    try { text = JSON.stringify(value); } catch (err) { text = String(value); }
+  }
+  if (text == null) return '';
+  return text.length > max ? text.slice(0, max - 1) + '…' : text;
+}
+
+// Turns a Meta payload into field names plus their new values.
+function summarizePayload(payload) {
+  const entries = Array.isArray(payload.entry) ? payload.entry : [];
+  return entries.map(function (entry) {
+    const changes = (entry.changes || []).map(function (change) {
+      return {
+        field: (change && change.field) || 'unknown',
+        value: summarizeValue(change && change.value, 500)
+      };
+    });
+    const messages = (entry.messaging || []).map(function (event) {
+      const field = event.message ? 'messages' : (event.postback ? 'messaging_postbacks' : 'messaging');
+      const value = event.message ? event.message.text
+        : (event.postback ? event.postback.payload : event);
+      return { field: field, value: summarizeValue(value, 500) };
+    });
+    return {
+      id: entry.id || null,
+      time: entry.time || null,
+      changes: changes.concat(messages)
+    };
+  });
+}
+
+function webhookStatusPayload() {
+  const base = String(PUBLIC_BASE_URL || '').replace(/\/+$/, '');
+  return {
+    verifyTokenConfigured: isConfigured(VERIFY_TOKEN),
+    appSecretConfigured: isConfigured(APP_SECRET),
+    publicBaseUrl: base || null,
+    callbackUrl: base ? base + '/webhooks/meta' : null,
+    events: webhookEvents.slice(0, 25)
+  };
+}
+
 function handleEvent(req, res) {
   const chunks = [];
   let size = 0;
@@ -117,20 +180,22 @@ function handleEvent(req, res) {
 
     if (LOG_PAYLOADS) {
       console.log('[webhook] payload', JSON.stringify(payload, null, 2));
-    } else {
-      const entries = Array.isArray(payload.entry) ? payload.entry : [];
-      const fields = [];
-      entries.forEach(function (entry) {
-        (entry.changes || []).forEach(function (change) {
-          if (change && change.field) fields.push(change.field);
-        });
-        (entry.messaging || []).forEach(function (event) {
-          fields.push(event.message ? 'messages' : 'messaging');
-        });
-      });
-      console.log('[webhook] %s event · %d entry(ies)%s', payload.object || 'unknown', entries.length,
-        fields.length ? ' · fields: ' + Array.from(new Set(fields)).join(', ') : '');
     }
+
+    const summary = summarizePayload(payload);
+    webhookEvents.unshift({
+      receivedAt: new Date().toISOString(),
+      object: payload.object || 'unknown',
+      entries: summary
+    });
+    if (webhookEvents.length > MAX_EVENTS) webhookEvents.length = MAX_EVENTS;
+
+    summary.forEach(function (entry) {
+      entry.changes.forEach(function (change) {
+        console.log('[webhook] %s field "%s" = %s', payload.object || 'unknown', change.field, change.value);
+      });
+    });
+    if (!summary.length) console.log('[webhook] %s event with no entries', payload.object || 'unknown');
 
     // Meta expects a fast 200; do the actual work asynchronously in production.
     send(res, 200, 'EVENT_RECEIVED');
@@ -144,6 +209,15 @@ const server = http.createServer(function (req, res) {
     if (req.method === 'GET') return verifyWebhook(url, res);
     if (req.method === 'POST') return handleEvent(req, res);
     return send(res, 405, 'Method not allowed');
+  }
+
+  if (url.pathname === '/webhooks/meta/events' && req.method === 'GET') {
+    return send(res, 200, JSON.stringify({ events: webhookEvents.slice(0, 25) }),
+      'application/json; charset=utf-8');
+  }
+
+  if (url.pathname === '/api/webhook-status' && req.method === 'GET') {
+    return send(res, 200, JSON.stringify(webhookStatusPayload()), 'application/json; charset=utf-8');
   }
 
   if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Method not allowed');
